@@ -44,10 +44,13 @@ public class ChargeOrderController {
 
     @PostMapping("/stop")
     public ChargeOrder stop(@RequestBody StopReq req) {
-        if (req.getOrderId() == null) {
-            throw new IllegalArgumentException("orderId 不能为空");
+        if (req.getOrderId() != null) {
+            return orderService.stopCharge(req.getOrderId(), req.getEnergyKwh());
         }
-        return orderService.stopCharge(req.getOrderId(), req.getEnergyKwh());
+        if (req.getPileId() != null) {
+            return orderService.stopChargeByPileId(req.getPileId(), req.getEnergyKwh());
+        }
+        throw new IllegalArgumentException("orderId 或 pileId 必须提供");
     }
 
     @Data
@@ -60,5 +63,6 @@ public class ChargeOrderController {
     public static class StopReq {
         private Long orderId;
         private BigDecimal energyKwh;
+        private Long pileId;
     }
 }

@@ -46,6 +46,19 @@ public class OrderService {
         ChargeOrder order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("orderId 不存在"));
 
+        return stopCharge(order, energyKwh);
+    }
+
+    /** 兼容前端：通过 pileId 结束最近一条 STARTED 订单 */
+    public ChargeOrder stopChargeByPileId(Long pileId, BigDecimal energyKwh) {
+        ChargeOrder order = orderRepository.findFirstByPileIdAndStatusOrderByStartTimeDesc(pileId, "STARTED")
+                .orElseThrow(() -> new IllegalArgumentException("未找到该桩正在充电的订单"));
+
+        return stopCharge(order, energyKwh);
+    }
+
+    private ChargeOrder stopCharge(ChargeOrder order, BigDecimal energyKwh) {
+        
         if (!"STARTED".equals(order.getStatus())) {
             return order;
         }
