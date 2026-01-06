@@ -7,6 +7,7 @@ import lombok.Data;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 
 @RestController
@@ -42,12 +43,20 @@ public class ChargeOrderController {
         return orderService.startCharge(req.pileId, req.userId);
     }
 
+    @PostMapping("/book")
+    public ChargeOrder book(@RequestBody BookReq req) {
+        return orderService.book(req.pileId, req.userId, req.scheduleTime);
+    }
+
     @PostMapping("/stop")
     public ChargeOrder stop(@RequestBody StopReq req) {
-        if (req.getOrderId() == null) {
-            throw new IllegalArgumentException("orderId 不能为空");
+        if (req.getOrderId() != null) {
+            return orderService.stopCharge(req.getOrderId(), req.getEnergyKwh());
         }
-        return orderService.stopCharge(req.getOrderId(), req.getEnergyKwh());
+        if (req.getPileId() != null) {
+            return orderService.stopChargeByPileId(req.getPileId(), req.getEnergyKwh());
+        }
+        throw new IllegalArgumentException("orderId 或 pileId 必须提供");
     }
 
     @Data
@@ -57,8 +66,16 @@ public class ChargeOrderController {
     }
 
     @Data
+    public static class BookReq {
+        private Long pileId;
+        private Long userId;
+        private Date scheduleTime;
+    }
+
+    @Data
     public static class StopReq {
         private Long orderId;
         private BigDecimal energyKwh;
+        private Long pileId;
     }
 }

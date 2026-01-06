@@ -46,4 +46,10 @@ public class ChargePileController {
         pileRepository.deleteById(id);
         return "success";
     }
+
+    // 兼容前端：/api/pile/deleteById/{id}
+    @DeleteMapping("/deleteById/{id:\\d+}")
+    public String deleteById(@PathVariable Long id) {
+        return delete(id);
+    }
 }
