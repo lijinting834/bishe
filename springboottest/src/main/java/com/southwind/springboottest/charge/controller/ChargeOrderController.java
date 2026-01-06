@@ -7,6 +7,7 @@ import lombok.Data;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 
 @RestController
@@ -42,6 +43,11 @@ public class ChargeOrderController {
         return orderService.startCharge(req.pileId, req.userId);
     }
 
+    @PostMapping("/book")
+    public ChargeOrder book(@RequestBody BookReq req) {
+        return orderService.book(req.pileId, req.userId, req.scheduleTime);
+    }
+
     @PostMapping("/stop")
     public ChargeOrder stop(@RequestBody StopReq req) {
         if (req.getOrderId() != null) {
@@ -57,6 +63,13 @@ public class ChargeOrderController {
     public static class StartReq {
         private Long pileId;
         private Long userId;
+    }
+
+    @Data
+    public static class BookReq {
+        private Long pileId;
+        private Long userId;
+        private Date scheduleTime;
     }
 
     @Data

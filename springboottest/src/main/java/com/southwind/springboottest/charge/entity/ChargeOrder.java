@@ -23,13 +23,16 @@ public class ChargeOrder {
     @Column(nullable = false)
     private Long userId;
 
-    /** CHARGING / FINISHED / ABNORMAL */
+    /** BOOKED / CHARGING / FINISHED / ABNORMAL */
     @Column(nullable = false, length = 20)
     private String status = "CHARGING";
 
     private Date startTime = new Date();
 
     private Date endTime;
+
+    /** 预约时间（可选） */
+    private Date scheduleTime;
 
     /** 电量(kWh) */
     private BigDecimal energyKwh;

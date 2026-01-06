@@ -6,108 +6,198 @@
   <title>校园智慧充电桩管理系统</title>
   <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
   <style>
-    body{margin:0;background:#f5f7fa;}
-    .header{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:white;border-bottom:1px solid #ebeef5;}
-    .brand{font-weight:700;}
-    .wrap{padding:16px;}
-    .card{background:#fff;border:1px solid #ebeef5;border-radius:8px;padding:14px;}
-    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
-    .metric{padding:12px;border:1px solid #ebeef5;border-radius:8px;background:#fff;}
+    :root{
+      --bg:#f4f6f9;
+      --aside:#1f2d3d;
+      --aside-active:#1890ff;
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;background:var(--bg);font-family:"Helvetica Neue",Arial,"PingFang SC",sans-serif;}
+    .layout{height:100vh;}
+    .brand{height:60px;display:flex;align-items:center;gap:8px;padding:0 16px;color:#fff;font-weight:700;border-bottom:1px solid rgba(255,255,255,0.08);}
+    .brand .logo{width:28px;height:28px;border-radius:50%;background:#fff;color:var(--aside);display:flex;align-items:center;justify-content:center;font-size:16px;}
+    .aside{background:var(--aside);color:#cfd8e3;}
+    .aside .menu{border-right:none;}
+    .aside .el-menu-item,.aside .el-submenu__title{color:#cfd8e3;}
+    .aside .el-menu-item.is-active{background:rgba(24,144,255,0.15)!important;color:#fff!important;border-right:3px solid var(--aside-active);}
+    .topbar{height:60px;background:#fff;border-bottom:1px solid #e6ebf1;padding:0 20px;display:flex;align-items:center;justify-content:space-between;}
+    .crumb{font-weight:600;color:#303133;}
+    .wrap{padding:20px;}
+    .card{background:#fff;border:1px solid #ebeef5;border-radius:10px;padding:16px;margin-bottom:16px;}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
+    .metric{padding:12px;border:1px solid #ebeef5;border-radius:10px;background:linear-gradient(145deg,#f8fbff,#fff);}    
     .metric .k{color:#909399;font-size:12px;}
-    .metric .v{font-size:22px;font-weight:700;margin-top:4px;}
-    .mt{margin-top:12px;}
+    .metric .v{font-size:24px;font-weight:700;margin-top:6px;}
+    .section-title{font-weight:700;font-size:16px;margin-bottom:12px;color:#303133;display:flex;align-items:center;gap:8px;}
+    .sub-note{color:#909399;font-size:13px;}
+    .tab-actions{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+    .status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px;}
+    .status-idle{background:#67c23a;}
+    .status-using{background:#409eff;}
+    .status-fault{background:#f56c6c;}
+    .status-offline{background:#909399;}
+    .chart-row{display:grid;grid-template-columns:2fr 1fr;gap:12px;}
+    @media (max-width: 1024px){.chart-row{grid-template-columns:1fr;}}
   </style>
 </head>
 <body>
 <div id="app">
-  <div class="header">
-    <div class="brand">校园智慧充电桩管理系统</div>
-    <div>
-      <el-tag v-if="me" type="success" style="margin-right:8px;">{{me.role}} · {{me.username}}</el-tag>
-      <el-button size="mini" @click="openLogin">切换账号</el-button>
-    </div>
-  </div>
+  <el-container class="layout">
+    <el-aside width="220px" class="aside">
+      <div class="brand">
+        <div class="logo">⚡</div>
+        <div>智慧充电</div>
+      </div>
+      <el-menu class="menu" :default-active="activeMenu" background-color="transparent" text-color="#cfd8e3" @select="selectMenu">
+        <el-menu-item v-for="item in menuItems" :key="item.name" :index="item.name" :disabled="item.requiresAdmin && !isAdmin">
+          <i :class="item.icon"></i>
+          <span slot="title">{{item.label}}</span>
+          <el-tag v-if="item.requiresAdmin" size="mini" type="info" style="margin-left:auto;">管理员</el-tag>
+        </el-menu-item>
+      </el-menu>
+    </el-aside>
 
-  <div class="wrap">
-    <div class="grid">
-      <div class="metric"><div class="k">站点数</div><div class="v">{{dash.siteCount || 0}}</div></div>
-      <div class="metric"><div class="k">充电桩数</div><div class="v">{{dash.pileCount || 0}}</div></div>
-      <div class="metric"><div class="k">正在充电</div><div class="v">{{dash.chargingPileCount || 0}}</div></div>
-      <div class="metric"><div class="k">未处理告警</div><div class="v">{{dash.unhandledAlarmCount || 0}}</div></div>
-    </div>
+    <el-container>
+      <div class="topbar">
+        <div class="crumb">{{menuLabel}}</div>
+        <div>
+          <el-tag v-if="me" type="success" style="margin-right:8px;">{{roleLabel}} · {{me.username}}</el-tag>
+          <el-button size="mini" @click="openLogin">切换账号</el-button>
+        </div>
+      </div>
 
-    <div class="card mt">
-      <el-tabs v-model="activeTab">
-        <el-tab-pane label="站点管理" name="site">
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
-            <el-button type="primary" size="mini" @click="openSiteDialog()">新增站点</el-button>
-            <el-button size="mini" @click="loadAll">刷新</el-button>
+      <el-main class="wrap">
+        <!-- dashboard -->
+        <div v-if="activeMenu==='dashboard'">
+          <div class="section-title">总体概览 <span class="sub-note">实时刷新充电桩状态、告警与订单概况</span></div>
+          <div class="grid">
+            <div class="metric"><div class="k">站点数</div><div class="v">{{dash.siteCount || 0}}</div></div>
+            <div class="metric"><div class="k">充电桩数</div><div class="v">{{dash.pileCount || 0}}</div></div>
+            <div class="metric"><div class="k">正在充电</div><div class="v">{{dash.chargingPileCount || 0}}</div></div>
+            <div class="metric"><div class="k">未处理告警</div><div class="v">{{dash.unhandledAlarmCount || 0}}</div></div>
+            <div class="metric"><div class="k">今日新增订单</div><div class="v">{{todayOrders}}</div></div>
+            <div class="metric"><div class="k">平均桩温(℃)</div><div class="v">{{avgTemp}}</div></div>
           </div>
-          <el-table :data="sites" size="mini" border style="width:100%">
-            <el-table-column prop="id" label="ID" width="70"/>
-            <el-table-column prop="name" label="站点名称"/>
-            <el-table-column prop="location" label="位置"/>
-            <el-table-column prop="description" label="说明"/>
-            <el-table-column label="操作" width="220">
-              <template slot-scope="scope">
-                <el-button size="mini" @click="openSiteDialog(scope.row)">编辑</el-button>
-                <el-button size="mini" type="danger" @click="delSite(scope.row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-tab-pane>
 
-        <el-tab-pane label="充电桩管理" name="pile">
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
-            <el-button type="primary" size="mini" @click="openPileDialog()">新增充电桩</el-button>
-            <el-button size="mini" @click="loadAll">刷新</el-button>
+          <div class="chart-row" style="margin-top:12px;">
+            <div class="card">
+              <div class="section-title">实时桩状态</div>
+              <el-table :data="piles" size="mini" border style="width:100%" height="360">
+                <el-table-column prop="pileNo" label="编号" width="110"/>
+                <el-table-column prop="siteId" label="站点" width="90"/>
+                <el-table-column label="状态" width="110">
+                  <template slot-scope="scope">
+                    <el-tag :type="tagType(scope.row.status)">{{scope.row.status}}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="powerKw" label="功率(kW)" width="110"/>
+                <el-table-column prop="temperature" label="温度(℃)" width="100"/>
+                <el-table-column prop="lastHeartbeat" label="心跳"/>
+              </el-table>
+            </div>
+            <div class="card">
+              <div class="section-title">状态分布</div>
+              <div v-for="item in statusSummary" :key="item.label" style="margin-bottom:12px;">
+                <div><span :class="['status-dot', item.dot]"></span>{{item.label}} <span class="sub-note">{{item.count}} 台</span></div>
+                <el-progress :percentage="item.percent" :status="item.type" :stroke-width="12"></el-progress>
+              </div>
+              <el-divider></el-divider>
+              <div class="section-title" style="margin-bottom:6px;">告警提醒</div>
+              <el-timeline style="padding-left:0;">
+                <el-timeline-item v-for="alarm in alarms.slice(0,4)" :key="alarm.id" :timestamp="alarm.alarmTime" :type="alarm.handled ? 'success' : 'danger'">
+                  {{alarm.message || alarm.alarmType}}（桩 {{alarm.pileId}}）
+                </el-timeline-item>
+                <el-timeline-item v-if="alarms.length===0" timestamp="-" type="info">暂无告警</el-timeline-item>
+              </el-timeline>
+            </div>
+          </div>
+        </div>
+
+        <!-- monitor -->
+        <div v-if="activeMenu==='monitor'" class="card">
+          <div class="section-title">实时充电监控</div>
+          <div class="tab-actions">
+            <el-button size="mini" type="primary" @click="loadAll">刷新</el-button>
+            <el-tag>空闲 {{statusCount.IDLE || 0}}</el-tag>
+            <el-tag type="success">充电中 {{statusCount.CHARGING || 0}}</el-tag>
+            <el-tag type="danger">故障 {{statusCount.FAULT || 0}}</el-tag>
+            <el-tag type="info">离线 {{statusCount.OFFLINE || 0}}</el-tag>
           </div>
           <el-table :data="piles" size="mini" border style="width:100%">
-            <el-table-column prop="id" label="ID" width="70"/>
-            <el-table-column prop="pileNo" label="桩编号" width="110"/>
-            <el-table-column prop="siteId" label="站点ID" width="90"/>
+            <el-table-column prop="pileNo" label="桩编号" width="120"/>
+            <el-table-column prop="siteId" label="站点" width="90"/>
             <el-table-column prop="status" label="状态" width="110">
-              <template slot-scope="scope">
-                <el-tag :type="tagType(scope.row.status)">{{scope.row.status}}</el-tag>
-              </template>
+              <template slot-scope="scope"><el-tag :type="tagType(scope.row.status)">{{scope.row.status}}</el-tag></template>
             </el-table-column>
-            <el-table-column prop="powerKw" label="功率(kW)" width="110"/>
+            <el-table-column prop="powerKw" label="额定功率(kW)" width="120"/>
             <el-table-column prop="gunCount" label="枪口" width="70"/>
             <el-table-column prop="temperature" label="温度(℃)" width="90"/>
-            <el-table-column prop="lastHeartbeat" label="心跳"/>
-            <el-table-column label="操作" width="330">
+            <el-table-column prop="lastHeartbeat" label="最近心跳"/>
+            <el-table-column label="操作" width="260">
               <template slot-scope="scope">
-                <el-button size="mini" @click="openPileDialog(scope.row)">编辑</el-button>
                 <el-button size="mini" type="success" @click="startCharge(scope.row)" :disabled="scope.row.status==='CHARGING'">开始充电</el-button>
                 <el-button size="mini" type="warning" @click="stopCharge(scope.row)" :disabled="scope.row.status!=='CHARGING'">结束充电</el-button>
-                <el-button size="mini" type="danger" @click="delPile(scope.row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
-        </el-tab-pane>
+        </div>
 
-        <el-tab-pane label="充电订单" name="order">
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <!-- booking -->
+        <div v-if="activeMenu==='booking'" class="card">
+          <div class="section-title">在线预约</div>
+          <div class="sub-note" style="margin-bottom:12px;">选择空闲桩提交预约，系统会在预约时间前提醒并锁定资源。</div>
+          <el-form inline :model="bookingForm" label-width="90px" size="mini" style="margin-bottom:12px;">
+            <el-form-item label="预约桩">
+              <el-select v-model="bookingForm.pileId" placeholder="选择空闲充电桩" style="width:220px;">
+                <el-option v-for="p in idlePiles" :key="p.id" :label="p.pileNo + '（站点'+p.siteId+'）'" :value="p.id" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="预约时间">
+              <el-date-picker v-model="bookingForm.schedule" type="datetime" placeholder="选择时间" style="width:220px;" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="submitBooking" :disabled="!me">提交预约</el-button>
+              <el-button @click="loadAll">刷新</el-button>
+            </el-form-item>
+          </el-form>
+          <el-alert v-if="!me" type="info" title="请先登录后再预约" :closable="false" show-icon style="margin-bottom:12px;"></el-alert>
+          <el-table :data="orders" size="mini" border style="width:100%">
+            <el-table-column prop="orderNo" label="订单号/预约号" width="180"/>
+            <el-table-column prop="pileId" label="桩ID" width="80"/>
+            <el-table-column prop="status" label="状态" width="100"/>
+            <el-table-column prop="scheduleTime" label="预约时间"/>
+            <el-table-column prop="startTime" label="开始时间"/>
+            <el-table-column prop="endTime" label="结束/预约"/>
+            <el-table-column prop="amount" label="金额(元)" width="100"/>
+          </el-table>
+        </div>
+
+        <!-- order -->
+        <div v-if="activeMenu==='order'" class="card">
+          <div class="section-title">计费与支付记录</div>
+          <div class="tab-actions">
             <el-button size="mini" @click="loadAll">刷新</el-button>
-            <el-tag type="info">简化版：开始/结束充电自动生成订单</el-tag>
+            <el-tag type="info">订单数据来源：开始/结束充电自动生成</el-tag>
           </div>
           <el-table :data="orders" size="mini" border style="width:100%">
             <el-table-column prop="id" label="ID" width="70"/>
             <el-table-column prop="orderNo" label="订单号" width="160"/>
             <el-table-column prop="pileId" label="桩ID" width="80"/>
-            <el-table-column prop="userId" label="用户ID" width="80"/>
+            <el-table-column prop="userId" label="用户ID" width="90"/>
             <el-table-column prop="status" label="状态" width="100"/>
+            <el-table-column prop="energyKwh" label="电量(kWh)" width="110"/>
+            <el-table-column prop="amount" label="金额(元)" width="110"/>
             <el-table-column prop="startTime" label="开始时间"/>
             <el-table-column prop="endTime" label="结束时间"/>
-            <el-table-column prop="energyKwh" label="电量(kWh)" width="100"/>
-            <el-table-column prop="amount" label="金额(元)" width="100"/>
           </el-table>
-        </el-tab-pane>
+        </div>
 
-        <el-tab-pane label="告警中心" name="alarm">
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <!-- alarm -->
+        <div v-if="activeMenu==='alarm'" class="card">
+          <div class="section-title">告警中心</div>
+          <div class="tab-actions">
             <el-button size="mini" @click="loadAll">刷新</el-button>
-            <el-tag type="warning">MQTT 开启后会自动生成告警（温度≥60 / FAULT / OFFLINE）</el-tag>
+            <el-tag type="warning">温度≥60 / 故障 / 离线 将触发告警</el-tag>
           </div>
           <el-table :data="alarms" size="mini" border style="width:100%">
             <el-table-column prop="id" label="ID" width="70"/>
@@ -126,11 +216,60 @@
               </template>
             </el-table-column>
           </el-table>
-        </el-tab-pane>
+        </div>
 
-      </el-tabs>
-    </div>
-  </div>
+        <!-- asset management -->
+        <div v-if="activeMenu==='asset'" class="card">
+          <div class="section-title">设备管理</div>
+          <el-alert v-if="!isAdmin" type="error" title="仅管理员可访问" :closable="false" show-icon></el-alert>
+          <template v-else>
+            <div class="tab-actions">
+              <el-button type="primary" size="mini" @click="openSiteDialog()">新增站点</el-button>
+              <el-button type="primary" size="mini" @click="openPileDialog()">新增充电桩</el-button>
+              <el-button size="mini" @click="loadAll">刷新</el-button>
+            </div>
+            <div class="section-title" style="margin-top:6px;">站点管理</div>
+            <el-table :data="sites" size="mini" border style="width:100%;margin-bottom:16px;">
+              <el-table-column prop="id" label="ID" width="70"/>
+              <el-table-column prop="name" label="站点名称"/>
+              <el-table-column prop="location" label="位置"/>
+              <el-table-column prop="description" label="说明"/>
+              <el-table-column label="操作" width="220">
+                <template slot-scope="scope">
+                  <el-button size="mini" @click="openSiteDialog(scope.row)">编辑</el-button>
+                  <el-button size="mini" type="danger" @click="delSite(scope.row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <div class="section-title">充电桩管理</div>
+            <el-table :data="piles" size="mini" border style="width:100%">
+              <el-table-column prop="id" label="ID" width="70"/>
+              <el-table-column prop="pileNo" label="桩编号" width="110"/>
+              <el-table-column prop="siteId" label="站点ID" width="90"/>
+              <el-table-column prop="status" label="状态" width="110">
+                <template slot-scope="scope">
+                  <el-tag :type="tagType(scope.row.status)">{{scope.row.status}}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="powerKw" label="功率(kW)" width="110"/>
+              <el-table-column prop="gunCount" label="枪口" width="70"/>
+              <el-table-column prop="temperature" label="温度(℃)" width="90"/>
+              <el-table-column prop="lastHeartbeat" label="心跳"/>
+              <el-table-column label="操作" width="330">
+                <template slot-scope="scope">
+                  <el-button size="mini" @click="openPileDialog(scope.row)">编辑</el-button>
+                  <el-button size="mini" type="success" @click="startCharge(scope.row)" :disabled="scope.row.status==='CHARGING'">开始充电</el-button>
+                  <el-button size="mini" type="warning" @click="stopCharge(scope.row)" :disabled="scope.row.status!=='CHARGING'">结束充电</el-button>
+                  <el-button size="mini" type="danger" @click="delPile(scope.row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </template>
+        </div>
+      </el-main>
+    </el-container>
+  </el-container>
 
   <!-- login -->
   <el-dialog title="登录" :visible.sync="loginVisible" width="420px" :close-on-click-modal="false">
@@ -184,7 +323,6 @@
       <el-button type="primary" @click="savePile">保存</el-button>
     </span>
   </el-dialog>
-
 </div>
 
 <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
@@ -197,7 +335,15 @@
     el: '#app',
     data(){
       return {
-        activeTab:'pile',
+        menuItems:[
+          {name:'dashboard', label:'概览', icon:'el-icon-data-line'},
+          {name:'monitor', label:'实时监控', icon:'el-icon-odometer'},
+          {name:'booking', label:'预约管理', icon:'el-icon-date'},
+          {name:'order', label:'计费记录', icon:'el-icon-document'},
+          {name:'alarm', label:'告警中心', icon:'el-icon-bell'},
+          {name:'asset', label:'设备管理', icon:'el-icon-setting', requiresAdmin:true}
+        ],
+        activeMenu:'dashboard',
         dash:{},
         me:null,
         loginVisible:false,
@@ -209,7 +355,52 @@
         siteDialogVisible:false,
         siteDialog:{},
         pileDialogVisible:false,
-        pileDialog:{}
+        pileDialog:{},
+        bookingForm:{pileId:null, schedule:''},
+        refreshTimer:null
+      }
+    },
+    computed:{
+      statusCount(){
+        return this.piles.reduce((m,p)=>{m[p.status]=(m[p.status]||0)+1;return m;},{});
+      },
+      statusSummary(){
+        const total = this.piles.length || 1;
+        const map = [
+          {label:'空闲', key:'IDLE', dot:'status-idle', type:'success'},
+          {label:'已预约', key:'BOOKED', dot:'status-using', type:'warning'},
+          {label:'充电中', key:'CHARGING', dot:'status-using', type:'success'},
+          {label:'故障', key:'FAULT', dot:'status-fault', type:'exception'},
+          {label:'离线', key:'OFFLINE', dot:'status-offline', type:'warning'}
+        ];
+        return map.map(i=>({
+          label:i.label,
+          dot:i.dot,
+          type:i.type,
+          count:this.statusCount[i.key] || 0,
+          percent: Math.round(((this.statusCount[i.key] || 0)/total)*100)
+        }));
+      },
+      idlePiles(){
+        return this.piles.filter(p=>p.status==='IDLE');
+      },
+      todayOrders(){
+        const today = new Date().toISOString().slice(0,10);
+        return this.orders.filter(o=>o.startTime && o.startTime.startsWith(today)).length;
+      },
+      avgTemp(){
+        if(!this.piles.length) return '--';
+        const val = this.piles.reduce((s,p)=> s + (parseFloat(p.temperature)||0),0)/this.piles.length;
+        return val.toFixed(1);
+      },
+      isAdmin(){ return this.me && this.me.role === 'ADMIN'; },
+      roleLabel(){
+        if(!this.me) return '';
+        return this.me.role==='ADMIN' ? '管理员' : this.me.role==='TEACHER' ? '教师' : '学生';
+      },
+      menuLabel(){
+        const item = this.menuItems.find(i=>i.name===this.activeMenu);
+        return item ? item.label : '';
       }
     },
     created(){
@@ -217,13 +408,26 @@
       if(me){ this.me = JSON.parse(me); }
       else { this.loginVisible = true; }
       this.loadAll();
+      this.refreshTimer = setInterval(()=> this.loadAll(), 8000);
+    },
+    beforeDestroy(){
+      if(this.refreshTimer) clearInterval(this.refreshTimer);
     },
     methods:{
       tagType(s){
+        if(s==='BOOKED') return 'info';
         if(s==='CHARGING') return 'success';
         if(s==='FAULT') return 'danger';
         if(s==='OFFLINE') return 'info';
         return 'warning';
+      },
+      selectMenu(name){
+        const item = this.menuItems.find(i=>i.name===name);
+        if(item && item.requiresAdmin && !this.isAdmin){
+          this.$message.warning('仅管理员可访问设备管理');
+          return;
+        }
+        this.activeMenu = name;
       },
       openLogin(){ this.loginVisible=true; },
       async doLogin(){
@@ -293,6 +497,20 @@
       async handleAlarm(row){
         await api.put('/api/alarm/handle/' + row.id);
         this.$message.success('已处理'); this.loadAll();
+      },
+      async submitBooking(){
+        if(!this.me){ return this.$message.info('请先登录'); }
+        if(!this.bookingForm.pileId || !this.bookingForm.schedule){
+          return this.$message.warning('请选择预约桩与时间');
+        }
+        await api.post('/api/order/book', {
+          pileId:this.bookingForm.pileId,
+          userId:this.me.id,
+          scheduleTime:this.bookingForm.schedule
+        });
+        this.$message.success('预约已提交');
+        this.bookingForm = {pileId:null, schedule:''};
+        this.loadAll();
       }
     }
   })
