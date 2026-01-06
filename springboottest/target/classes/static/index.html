@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>校园智慧充电桩管理系统</title>
+  <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+  <style>
+    body{margin:0;background:#f5f7fa;}
+    .header{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:white;border-bottom:1px solid #ebeef5;}
+    .brand{font-weight:700;}
+    .wrap{padding:16px;}
+    .card{background:#fff;border:1px solid #ebeef5;border-radius:8px;padding:14px;}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+    .metric{padding:12px;border:1px solid #ebeef5;border-radius:8px;background:#fff;}
+    .metric .k{color:#909399;font-size:12px;}
+    .metric .v{font-size:22px;font-weight:700;margin-top:4px;}
+    .mt{margin-top:12px;}
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="brand">校园智慧充电桩管理系统</div>
+    <div>
+      <el-tag v-if="me" type="success" style="margin-right:8px;">{{me.role}} · {{me.username}}</el-tag>
+      <el-button size="mini" @click="openLogin">切换账号</el-button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="grid">
+      <div class="metric"><div class="k">站点数</div><div class="v">{{dash.siteCount || 0}}</div></div>
+      <div class="metric"><div class="k">充电桩数</div><div class="v">{{dash.pileCount || 0}}</div></div>
+      <div class="metric"><div class="k">正在充电</div><div class="v">{{dash.chargingPileCount || 0}}</div></div>
+      <div class="metric"><div class="k">未处理告警</div><div class="v">{{dash.unhandledAlarmCount || 0}}</div></div>
+    </div>
+
+    <div class="card mt">
+      <el-tabs v-model="activeTab">
+        <el-tab-pane label="站点管理" name="site">
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <el-button type="primary" size="mini" @click="openSiteDialog()">新增站点</el-button>
+            <el-button size="mini" @click="loadAll">刷新</el-button>
+          </div>
+          <el-table :data="sites" size="mini" border style="width:100%">
+            <el-table-column prop="id" label="ID" width="70"/>
+            <el-table-column prop="name" label="站点名称"/>
+            <el-table-column prop="location" label="位置"/>
+            <el-table-column prop="description" label="说明"/>
+            <el-table-column label="操作" width="220">
+              <template slot-scope="scope">
+                <el-button size="mini" @click="openSiteDialog(scope.row)">编辑</el-button>
+                <el-button size="mini" type="danger" @click="delSite(scope.row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <el-tab-pane label="充电桩管理" name="pile">
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <el-button type="primary" size="mini" @click="openPileDialog()">新增充电桩</el-button>
+            <el-button size="mini" @click="loadAll">刷新</el-button>
+          </div>
+          <el-table :data="piles" size="mini" border style="width:100%">
+            <el-table-column prop="id" label="ID" width="70"/>
+            <el-table-column prop="pileNo" label="桩编号" width="110"/>
+            <el-table-column prop="siteId" label="站点ID" width="90"/>
+            <el-table-column prop="status" label="状态" width="110">
+              <template slot-scope="scope">
+                <el-tag :type="tagType(scope.row.status)">{{scope.row.status}}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="powerKw" label="功率(kW)" width="110"/>
+            <el-table-column prop="gunCount" label="枪口" width="70"/>
+            <el-table-column prop="temperature" label="温度(℃)" width="90"/>
+            <el-table-column prop="lastHeartbeat" label="心跳"/>
+            <el-table-column label="操作" width="330">
+              <template slot-scope="scope">
+                <el-button size="mini" @click="openPileDialog(scope.row)">编辑</el-button>
+                <el-button size="mini" type="success" @click="startCharge(scope.row)" :disabled="scope.row.status==='CHARGING'">开始充电</el-button>
+                <el-button size="mini" type="warning" @click="stopCharge(scope.row)" :disabled="scope.row.status!=='CHARGING'">结束充电</el-button>
+                <el-button size="mini" type="danger" @click="delPile(scope.row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <el-tab-pane label="充电订单" name="order">
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <el-button size="mini" @click="loadAll">刷新</el-button>
+            <el-tag type="info">简化版：开始/结束充电自动生成订单</el-tag>
+          </div>
+          <el-table :data="orders" size="mini" border style="width:100%">
+            <el-table-column prop="id" label="ID" width="70"/>
+            <el-table-column prop="orderNo" label="订单号" width="160"/>
+            <el-table-column prop="pileId" label="桩ID" width="80"/>
+            <el-table-column prop="userId" label="用户ID" width="80"/>
+            <el-table-column prop="status" label="状态" width="100"/>
+            <el-table-column prop="startTime" label="开始时间"/>
+            <el-table-column prop="endTime" label="结束时间"/>
+            <el-table-column prop="energyKwh" label="电量(kWh)" width="100"/>
+            <el-table-column prop="amount" label="金额(元)" width="100"/>
+          </el-table>
+        </el-tab-pane>
+
+        <el-tab-pane label="告警中心" name="alarm">
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <el-button size="mini" @click="loadAll">刷新</el-button>
+            <el-tag type="warning">MQTT 开启后会自动生成告警（温度≥60 / FAULT / OFFLINE）</el-tag>
+          </div>
+          <el-table :data="alarms" size="mini" border style="width:100%">
+            <el-table-column prop="id" label="ID" width="70"/>
+            <el-table-column prop="pileId" label="桩ID" width="80"/>
+            <el-table-column prop="alarmType" label="类型" width="120"/>
+            <el-table-column prop="message" label="内容"/>
+            <el-table-column prop="alarmTime" label="时间" width="180"/>
+            <el-table-column prop="handled" label="已处理" width="90">
+              <template slot-scope="scope">
+                <el-tag :type="scope.row.handled ? 'success' : 'danger'">{{scope.row.handled ? '是' : '否'}}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="140">
+              <template slot-scope="scope">
+                <el-button size="mini" type="primary" @click="handleAlarm(scope.row)" :disabled="scope.row.handled">标记处理</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+      </el-tabs>
+    </div>
+  </div>
+
+  <!-- login -->
+  <el-dialog title="登录" :visible.sync="loginVisible" width="420px" :close-on-click-modal="false">
+    <el-form label-width="90px">
+      <el-form-item label="用户名">
+        <el-input v-model="loginForm.username" placeholder="比如：admin / student01" />
+      </el-form-item>
+      <el-form-item label="角色">
+        <el-select v-model="loginForm.role" placeholder="选择角色" style="width:100%">
+          <el-option label="管理员" value="ADMIN" />
+          <el-option label="学生" value="STUDENT" />
+          <el-option label="教师" value="TEACHER" />
+        </el-select>
+      </el-form-item>
+    </el-form>
+    <span slot="footer">
+      <el-button @click="loginVisible=false">取消</el-button>
+      <el-button type="primary" @click="doLogin">登录</el-button>
+    </span>
+  </el-dialog>
+
+  <!-- site dialog -->
+  <el-dialog :title="siteDialog.id ? '编辑站点' : '新增站点'" :visible.sync="siteDialogVisible" width="520px">
+    <el-form :model="siteDialog" label-width="90px">
+      <el-form-item label="站点名称"><el-input v-model="siteDialog.name" /></el-form-item>
+      <el-form-item label="位置"><el-input v-model="siteDialog.location" /></el-form-item>
+      <el-form-item label="说明"><el-input v-model="siteDialog.description" /></el-form-item>
+    </el-form>
+    <span slot="footer">
+      <el-button @click="siteDialogVisible=false">取消</el-button>
+      <el-button type="primary" @click="saveSite">保存</el-button>
+    </span>
+  </el-dialog>
+
+  <!-- pile dialog -->
+  <el-dialog :title="pileDialog.id ? '编辑充电桩' : '新增充电桩'" :visible.sync="pileDialogVisible" width="560px">
+    <el-form :model="pileDialog" label-width="110px">
+      <el-form-item label="桩编号(pileNo)"><el-input v-model="pileDialog.pileNo" placeholder="如 A01" /></el-form-item>
+      <el-form-item label="站点ID"><el-input v-model.number="pileDialog.siteId" placeholder="填站点ID" /></el-form-item>
+      <el-form-item label="额定功率(kW)"><el-input v-model="pileDialog.powerKw" placeholder="如 1.2" /></el-form-item>
+      <el-form-item label="枪口数量"><el-input v-model.number="pileDialog.gunCount" /></el-form-item>
+      <el-form-item label="状态"><el-select v-model="pileDialog.status" style="width:100%">
+        <el-option value="IDLE" label="空闲" />
+        <el-option value="CHARGING" label="充电中" />
+        <el-option value="FAULT" label="故障" />
+        <el-option value="OFFLINE" label="离线" />
+      </el-select></el-form-item>
+    </el-form>
+    <span slot="footer">
+      <el-button @click="pileDialogVisible=false">取消</el-button>
+      <el-button type="primary" @click="savePile">保存</el-button>
+    </span>
+  </el-dialog>
+
+</div>
+
+<script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+  const api = axios.create({ baseURL: '' });
+
+  new Vue({
+    el: '#app',
+    data(){
+      return {
+        activeTab:'pile',
+        dash:{},
+        me:null,
+        loginVisible:false,
+        loginForm:{username:'admin', role:'ADMIN'},
+        sites:[],
+        piles:[],
+        orders:[],
+        alarms:[],
+        siteDialogVisible:false,
+        siteDialog:{},
+        pileDialogVisible:false,
+        pileDialog:{}
+      }
+    },
+    created(){
+      const me = localStorage.getItem('me');
+      if(me){ this.me = JSON.parse(me); }
+      else { this.loginVisible = true; }
+      this.loadAll();
+    },
+    methods:{
+      tagType(s){
+        if(s==='CHARGING') return 'success';
+        if(s==='FAULT') return 'danger';
+        if(s==='OFFLINE') return 'info';
+        return 'warning';
+      },
+      openLogin(){ this.loginVisible=true; },
+      async doLogin(){
+        const res = await api.post('/api/auth/login', this.loginForm);
+        this.me = res.data;
+        localStorage.setItem('me', JSON.stringify(this.me));
+        this.loginVisible=false;
+        this.$message.success('登录成功');
+        this.loadAll();
+      },
+      async loadAll(){
+        try{
+          const [dash, sites, piles, orders, alarms] = await Promise.all([
+            api.get('/api/dashboard/summary'),
+            api.get('/api/site/findAll'),
+            api.get('/api/pile/findAll'),
+            api.get('/api/order/findAll'),
+            api.get('/api/alarm/findAll')
+          ]);
+          this.dash = dash.data;
+          this.sites = sites.data;
+          this.piles = piles.data;
+          this.orders = orders.data;
+          this.alarms = alarms.data;
+        }catch(e){
+          this.$message.error('加载失败：' + (e.response && e.response.data && e.response.data.message ? e.response.data.message : e.message));
+        }
+      },
+      // site
+      openSiteDialog(row){ this.siteDialog = row ? Object.assign({}, row) : {}; this.siteDialogVisible = true; },
+      async saveSite(){
+        if(!this.siteDialog.name){ return this.$message.warning('站点名称必填'); }
+        if(this.siteDialog.id){ await api.put('/api/site/update', this.siteDialog); }
+        else { await api.post('/api/site/save', this.siteDialog); }
+        this.siteDialogVisible=false; this.$message.success('保存成功'); this.loadAll();
+      },
+      async delSite(row){
+        await this.$confirm('确定删除该站点？','提示');
+        await api.delete('/api/site/deleteById/' + row.id);
+        this.$message.success('已删除'); this.loadAll();
+      },
+      // pile
+      openPileDialog(row){
+        this.pileDialog = row ? Object.assign({}, row) : {status:'IDLE', gunCount:1};
+        this.pileDialogVisible = true;
+      },
+      async savePile(){
+        if(!this.pileDialog.pileNo){ return this.$message.warning('桩编号必填'); }
+        if(this.pileDialog.id){ await api.put('/api/pile/update', this.pileDialog); }
+        else { await api.post('/api/pile/save', this.pileDialog); }
+        this.pileDialogVisible=false; this.$message.success('保存成功'); this.loadAll();
+      },
+      async delPile(row){
+        await this.$confirm('确定删除该充电桩？','提示');
+        await api.delete('/api/pile/deleteById/' + row.id);
+        this.$message.success('已删除'); this.loadAll();
+      },
+      async startCharge(pile){
+        if(!this.me){ return this.openLogin(); }
+        await api.post('/api/order/start', { pileId: pile.id, userId: this.me.id });
+        this.$message.success('已开始充电'); this.loadAll();
+      },
+      async stopCharge(pile){
+        await api.post('/api/order/stop', { pileId: pile.id });
+        this.$message.success('已结束充电'); this.loadAll();
+      },
+      async handleAlarm(row){
+        await api.put('/api/alarm/handle/' + row.id);
+        this.$message.success('已处理'); this.loadAll();
+      }
+    }
+  })
+</script>
+</body>
+</html>

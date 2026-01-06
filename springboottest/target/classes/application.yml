@@ -1,0 +1,35 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/campus_charge?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456789
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.MySQL55Dialect
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL55Dialect
+        format_sql: true
+
+  resources:
+    static-locations: classpath:/static/,file:./uploads/
+
+# MQTT 遥测数据（可选：不配置也能运行系统）
+mqtt:
+  enabled: false
+  broker: tcp://127.0.0.1:1883
+  clientId: campus-charge-server
+  username:
+  password:
+  topic: campus/charge/telemetry/#
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+
+server:
+  port: 8181
