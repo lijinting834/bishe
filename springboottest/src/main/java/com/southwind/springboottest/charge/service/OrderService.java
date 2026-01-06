@@ -75,6 +75,9 @@ public class OrderService {
     /** 兼容前端：通过 pileId 结束最近一条 CHARGING 订单 */
     public ChargeOrder stopChargeByPileId(Long pileId, BigDecimal energyKwh) {
         ChargeOrder order = orderRepository.findFirstByPileIdAndStatusOrderByStartTimeDesc(pileId, "CHARGING")
+    /** 兼容前端：通过 pileId 结束最近一条 STARTED 订单 */
+    public ChargeOrder stopChargeByPileId(Long pileId, BigDecimal energyKwh) {
+        ChargeOrder order = orderRepository.findFirstByPileIdAndStatusOrderByStartTimeDesc(pileId, "STARTED")
                 .orElseThrow(() -> new IllegalArgumentException("未找到该桩正在充电的订单"));
 
         return stopCharge(order, energyKwh);
@@ -82,6 +85,8 @@ public class OrderService {
 
     private ChargeOrder stopCharge(ChargeOrder order, BigDecimal energyKwh) {
         if (!"CHARGING".equalsIgnoreCase(order.getStatus())) {
+        
+        if (!"STARTED".equals(order.getStatus())) {
             return order;
         }
 
